@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>cut</title>
+</head>
+<script async src="opencv3.4.js" onload="onOpenCvReady()" type="text/javascript"></script>
+<body>
+<div class="inputoutput">
+    <p id="status">OpenCV.js is loading...</p>
+    <canvas id="canvasOutput" width="100" height="100" style="border: 1px solid black"></canvas>
+    <img id="imageSrc" alt="No Image"/>
+    <div class="caption">imageSrc <input type="file" id="fileInput" name="file"/></div>
+</div>
+</body>
+<script type="text/javascript">
+    let _cv = null
+    let imgElement = document.getElementById("imageSrc")
+    let inputElement = document.getElementById("fileInput")
+    inputElement.addEventListener("change", (e) => {
+        imgElement.src = URL.createObjectURL(e.target.files[0])
+    }, false)
+
+    imgElement.onload = function () {
+        main()
+    }
+
+    function onOpenCvReady() {
+        document.getElementById('status').innerHTML = 'OpenCV.js is ready.'
+        _cv = cv
+        console.log(cv)
+        // console.log(cv.Float32Array)
+    }
+
+    const faceTransform = [[0, 0], [Math.PI / 2, 0], [Math.PI, 0], [-Math.PI / 2, 0], [0, -Math.PI / 2], [0, Math.PI / 2]]
+
+    function createCubeMapFace(ins, face, faceId = 0, width = -1, height = -1) {
+        let inWidth = ins.cols;
+        let inHeight = ins.rows;     // 获取图片的行列数量
+
+        console.log('cv--')
+        // 分配图
+        let mapx = new cv.Mat(height, width, cv.CV_32F);
+        let mapy = new cv.Mat(height, width, cv.CV_32F);
+
+        // return
+        // 计算的邻边(ak)和对边(an)
+        // 从球体中心生成的三角形
+        // 指向立方体面
+        const an = Math.sin(Math.PI / 4);
+        const ak = Math.cos(Math.PI / 4);
+
+        const ftu = faceTransform[faceId][0];
+        const ftv = faceTransform[faceId][1];
+
+        // 对于目标图像中的每个点
+        // 计算相应的源坐标                     对于每个图像计算相应的源坐标
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+
+                // 将面像素坐标映射到平面上的[- 1,1]               将坐标映射在平面上
+                let nx = y / height - 0.5;
+                let ny = x / width - 0.5;
+
+                nx *= 2;
+                ny *= 2;
+
+                // 将[-1,1]平面坐标映射到[-an, an]
+                // 这是单位球的坐标
+                // 包含我们的盒子。
+                nx *= an;
+                ny *= an;
+
+                let u, v;
+
+                // 从平面投影到球面。
+                if (ftv == 0) {
+                    // 中心的面
+                    u = Math.atan2(nx, ak);
+                    v = Math.atan2(ny * Math.cos(u), ak);
+                    u += ftu;
+                } else if (ftv > 0) {
+                    // 底部的面
+                    let d = Math.sqrt(nx * nx + ny * ny);
+                    v = Math.PI / 2 - Math.atan2(d, ak);
+                    u = Math.atan2(ny, nx);
+                } else {
+                    // 顶部的面
+                    //cout << "aaa";
+                    let d = Math.sqrt(nx * nx + ny * ny);
+                    v = -Math.PI / 2 + Math.atan2(d, ak);
+                    u = Math.atan2(-ny, nx);
+                }
+
+                // 分别从角坐标映射到[- 1,1]
+                u = u / (Math.PI);
+                v = v / (Math.PI / 2);
+
+                // 如果我们的坐标超出边界，就绕过去。
+                while (v < -1) {
+                    v += 2;
+                    u += 1;
+                }
+                while (v > 1) {
+                    v -= 2;
+                    u += 1;
+                }
+
+                while (u < -1) {
+                    u += 2;
+                }
+                while (u > 1) {
+                    u -= 2;
+                }
+
+                // 在纹理空间中从[- 1,1]映射到
+                u = u / 2.0 + 0.5;
+                v = v / 2.0 + 0.5;
+
+                u = u * (inWidth - 1);
+                v = v * (inHeight - 1);
+
+                mapx.at = u;
+                mapy.at = v;
+            }
+        }
+
+        // 如果输出图像大小或类型错误，则重新创建该图像
+        /* if (face.cols != width || face.rows != height ||
+            face.type() != ins.type()) {
+            face = new cv.Mat(width, height, ins.type());
+            //  system("pause");
+        } */
+
+        cv.remap(ins, face, mapx, mapy, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar())
+
+        //   imshow("456", face);
+        if (faceId == 0) {
+            // cv.imwrite("D:\\study\\pano\\static\\clineCut\\cube0000.png", face);
+        } else if (faceId == 1) {
+            // cv.imwrite("D:\\study\\pano\\static\\clineCut\\imgcube0001.png", face);
+        } else if (faceId == 2) {
+            // cv.imwrite("D:\\study\pano\static\clineCut\\cube0002.png", face);
+        } else if (faceId == 3) {
+            // cv.imwrite("D:\\study\\pano\\static\\clineCut\\imgcube0003.png", face);
+        } else if (faceId == 4) {
+            // cv.imwrite("D:\\study\\pano\\static\\clineCut\\imgcube0004.png", face);
+        } else if (faceId == 5) {
+            // cv.imwrite("D:\\study\\pano\\static\\clineCut\\imgcube0005.png", face);
+        }
+        //  waitKey(10000);
+        console.log('face------------------', face)
+        cv.imshow("canvasOutput", face);
+    }
+
+    function main() {
+        const srcImage = new cv.Mat(cv.imread(imgElement))
+        console.log('srcImage------------', srcImage)
+        let resultImage = new cv.Mat() // srcImage.cols, srcImage.rows, srcImage.type()
+        console.log('resultImage------------', resultImage)
+
+        //  namedWindow("游戏原画");
+        //  imshow("游戏原画", srcImage);
+        //  waitKey(6000);
+        // return
+        for (let i = 0; i < 6; i++) {
+            // srcImage.cols, srcImage.rows
+            createCubeMapFace(srcImage, resultImage, i, srcImage.cols, srcImage.rows);
+        }
+    }
+</script>
+</html>
